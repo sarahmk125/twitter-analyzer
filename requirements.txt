@@ -1,0 +1,2 @@
+twython==3.7.0
+panads==0.25.0
