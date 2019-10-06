@@ -1,2 +1,5 @@
 twython==3.7.0
 panads==0.25.0
+nltk==3.4.5
+matplotlib==41.0.1
+seaborn==0.9.0

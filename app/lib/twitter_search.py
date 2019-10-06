@@ -6,6 +6,12 @@ from twython import Twython
 from math import ceil
 
 
+"""
+Sources:
+Twython reference: https://stackabuse.com/accessing-the-twitter-api-with-python/
+"""
+
+
 class TwitterSearch(object):
     def __init__(self):
         pass
