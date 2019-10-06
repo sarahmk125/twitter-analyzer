@@ -1,4 +1,4 @@
-# MSDS Class Projects
+# MSDS 453 Final Project
 
 ## Background
 
