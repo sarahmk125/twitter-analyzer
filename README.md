@@ -17,3 +17,6 @@ Scripts:
 - CD into the scripts folder
 - Do this only once: Run: `python3` then `import nltk` then `nltk.download()`. Select `book`.
 - Run: `python data_exploreation_a1.py`
+
+`assigning_class_a2.py`
+- This script was run once to generate a users file to manually tag each user with a class. No need to run again. This can be run from the general folder.
