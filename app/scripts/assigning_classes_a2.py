@@ -22,7 +22,7 @@ def _load_jsonl(input_path) -> list:
 
 
 def _jsonl_to_df(filename):
-    jsonl_file = 'app/tweets/' + filename + '.jsonl'
+    jsonl_file = '../tweets/' + filename + '.jsonl'
     tweets_data = _load_jsonl(jsonl_file)
     db_data = []
     # Note: ignoring hashtags for now since they're nested
