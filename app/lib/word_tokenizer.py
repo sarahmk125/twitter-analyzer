@@ -4,16 +4,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
-
+import os
+import re
+import string
 
 # Note: this requires nltk.download() first as described in the README.
 # from nltk.book import *
 from scipy.sparse import csr_matrix
 from nltk.corpus import stopwords
-#from nltk import word_tokenize, FreqDist
 from nltk.tokenize import TreebankWordTokenizer
 from collections import Counter, OrderedDict
 from sklearn.feature_extraction.text import TfidfVectorizer
+from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from gensim.test.utils import get_tmpfile
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+from sklearn.ensemble import RandomForestClassifier
 
 
 """
@@ -39,12 +45,11 @@ class WordTokenizer(object):
         print('[WordTokenizer] Loaded {} records from {}'.format(len(data), input_path))
         return data
 
-    def _jsonl_to_df(self, filename):
+    def _jsonl_to_df(self, filename, db_cols):
         jsonl_file = 'app/tweets/' + filename + '.jsonl'
         tweets_data = self._load_jsonl(jsonl_file)
         db_data = []
         # Note: ignoring hashtags for now since they're nested
-        db_cols = ['search_query', 'id_str', 'full_text', 'created_at', 'favorite_count', 'username', 'user_description']
         for d in tweets_data:
             db_data.append([])
             for col in db_cols:
@@ -55,7 +60,8 @@ class WordTokenizer(object):
 
     def _user_grouper(self, filename):
         # For each unique user, join all tweets into one tweet row in the new df.
-        tweets_df = self._jsonl_to_df(filename)
+        db_cols = ['search_query', 'id_str', 'full_text', 'created_at', 'favorite_count', 'username', 'user_description']
+        tweets_df = self._jsonl_to_df(filename, db_cols)
         users = list(tweets_df['username'].unique())
         tweets_by_user_df = pd.DataFrame(columns=['username', 'user_description', 'tweets'])
 
@@ -69,9 +75,79 @@ class WordTokenizer(object):
         # Return the data frame with one row per user, tweets concatenated into one string.
         return tweets_by_user_df
 
-    def analyst_judgement(self, filename, count_words):
+    def _parse_doc(self, text):
+        text = text.lower()
+        text = re.sub(r'&(.)+', "", text)  # no & references
+        text = re.sub(r'pct', 'percent', text)  # replace pct abreviation
+        text = re.sub(r"[^\w\d'\s]+", '', text)  # no punct except single quote
+        text = re.sub(r'[^\x00-\x7f]', r'', text)  # no non-ASCII strings
+
+        # Omit words that are all digits
+        if text.isdigit():
+            text = ""
+
+        # # Get rid of escape codes
+        # for code in codelist:
+        #     text = re.sub(code, ' ', text)
+
+        # Replace multiple spacess with one space
+        text = re.sub('\s+', ' ', text)
+
+        return text
+
+    def _parse_words(self, text, drop_stopwords=False, stemming=False): 
+        # split document into individual words
+        tokens = text.split()
+        re_punc = re.compile('[%s]' % re.escape(string.punctuation))
+
+        # remove punctuation from each word
+        tokens = [re_punc.sub('', w) for w in tokens]
+
+        # remove remaining tokens that are not alphabetic
+        tokens = [word for word in tokens if word.isalpha()]
+
+        # filter out tokens that are one or two characters long
+        tokens = [word for word in tokens if len(word) > 2]
+
+        # filter out tokens that are more than twenty characters long
+        tokens = [word for word in tokens if len(word) < 21]
+
+        # filter out stop words if requested
+        if drop_stopwords:
+            tokens = [w for w in tokens if w not in stoplist]
+
+        # perform word stemming if requested
+        if stemming:
+            ps = PorterStemmer()
+            tokens = [ps.stem(word) for word in tokens]
+
+        # recreate the document string from parsed words
+        text = ''
+        for token in tokens:
+            text = text + ' ' + token
+
+        return tokens, text
+
+    def _get_train_test_data(self, filename):
         # Get df, and list of all users' tweets.
         tweets_by_user_df = self._user_grouper(filename)
+        
+        # Get user classes
+        db_cols = ['class', 'user_description', 'username']
+        user_class_df = self._jsonl_to_df('users', db_cols)
+        user_class_df = user_class_df[['username','class']]
+
+        tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
+
+        train, test = train_test_split(tagged_df, test_size=0.2)
+        train_target = train['class']
+        test_target = test['class']
+        return train, test, train_target, test_target
+
+    def analyst_judgement(self, filename, count_words):
+        print('[WordTokenizer] Getting analyst judgement vectors...')
+        # Get df, and list of all users' tweets.
+        tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
 
         # Tokenize whole corpus, where lexicon counts are counts of each word across all tweets in the file
         tokenizer = TreebankWordTokenizer()
@@ -90,6 +166,7 @@ class WordTokenizer(object):
         # Vectorization: 
         # Take X most common words, that is the size of the vector for each document.
         # The value in each vector: # times that word is present in the doc / total doc length
+        # Apply this for the training and test dfs
         zero_vector = OrderedDict((word, 0) for word in top_words)
         tweets_by_user_vec = []
         for index, row in tweets_by_user_df.iterrows():
@@ -107,14 +184,36 @@ class WordTokenizer(object):
 
             # Transform ordered dict to list
             vec_list = [i[1] for i in vec.items()]
-            tweets_by_user_vec.append(vec_list)
+            vec_array = np.array(vec_list)
+            tweets_by_user_vec.append(vec_array)
+
+        tweets_by_user_vec_test = []
+        for index, row in tweets_by_user_df_test.iterrows():
+            vec = copy.copy(zero_vector)
+            tokens = tokenizer.tokenize(row['tweets'].lower())
+            token_counts = Counter(tokens)
+
+            # Iterate through all words in document, seeing if they should be assigned to value in vector
+            for key, value in token_counts.items():
+                try:
+                    vec[key] = value / len(tokens)
+                except KeyError:
+                    # Word is not top word, not doing anything with that information.
+                    continue
+
+            # Transform ordered dict to list
+            vec_list = [i[1] for i in vec.items()]
+            vec_array = np.array(vec_list)
+            tweets_by_user_vec_test.append(vec_array)
 
         tweets_by_user_array = np.array(tweets_by_user_vec)
-        return top_words, tweets_by_user_array
+        tweets_by_user_array_test = np.array(tweets_by_user_vec_test)
+        return top_words, tweets_by_user_array, tweets_by_user_array_test, train_target, test_target
 
     def tf_idf(self, filename, count_words):
+        print('[WordTokenizer] Getting TF-IDF vectors...')
         # Get df, and list of all users' tweets.
-        tweets_by_user_df = self._user_grouper(filename)
+        tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
 
         # NOTE: cleanup with stopwords makes it not english because the string removal isn't right.
         # all_stopwords = list(stopwords.words('english'))
@@ -123,85 +222,72 @@ class WordTokenizer(object):
         #     tweets_by_user_df['tweets'] = tweets_by_user_df['tweets'].str.replace(word,'')
 
         tweets_by_user_list = tweets_by_user_df['tweets'].tolist()
+        tweets_by_user_list_test = tweets_by_user_df_test['tweets'].tolist()
 
         # Calculate TF-IDF
         vectorizer = TfidfVectorizer()
         tweets_by_user_vec = vectorizer.fit_transform(tweets_by_user_list)
+        tweets_by_user_vec_test = vectorizer.transform(tweets_by_user_list_test)
 
         # Change up matrices to get most important words
         feature_array = np.array(vectorizer.get_feature_names())
         tweets_by_user_sorted_vec = np.argsort(tweets_by_user_vec.toarray()).flatten()[::-1]
 
-        top_words = feature_array[tweets_by_user_sorted_vec][:count_words]
-        return top_words, tweets_by_user_vec
+        # top_words_tfidf = feature_array[tweets_by_user_sorted_vec][:count_words]
+        return tweets_by_user_vec, tweets_by_user_vec_test, train_target, test_target
 
+    def nn_embeddings(self, filename, retrain=True):
+        print('[WordTokenizer] Getting NN embedding vectors...')
+        # NOTE: getting embeddings for entire corpus. Not splitting into train/test yet.
+        #       The train/test split will occur outside of this function as the model develops next assignment.
 
+        # Use DF for all tweets by user
+        tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
 
+        # Format the documents
+        tweets_by_user_list = tweets_by_user_df['tweets'].tolist()
+        documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(tweets_by_user_list)]
+        tokens = []
+        for doc in tweets_by_user_list:
+            text_string = self._parse_doc(doc)
+            doc_tokens, text_string = self._parse_words(text_string)
+            tokens.append(doc_tokens)
 
-        # # Tokenize whole corpus
-                # all_tweets = ' '.join(tweets_by_user_df['tweets'])
-        # tokenizer = TreebankWordTokenizer()
-        # lexicon = sorted(tokenizer.tokenize(all_tweets.lower()))
-        # all_stopwords = set(stopwords.words('english'))
-        # lexicon = [x for x in lexicon if x not in all_stopwords]
-        # lexicon_counts = Counter(lexicon)
+        # Format test documents
+        tweets_by_user_list_test = tweets_by_user_df_test['tweets'].tolist()
+        documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(tweets_by_user_list_test)]
+        tokens_test = []
+        for doc in tweets_by_user_list_test:
+            text_string = self._parse_doc(doc)
+            doc_tokens, text_string = self._parse_words(text_string)
+            tokens_test.append(doc_tokens)
 
+        model_filename = get_tmpfile('doc2vec_model')
 
-        # # Assign vector for each user
-        # zero_vector = OrderedDict((token, 0) for token in lexicon)
-        # doc_vectors = []
-        # for row in tweets_by_user_df.iterrows():
-        #     vec = copy.copt(zero_vector)
-        #     tokens = tokenizer.tokenize(row['tweets'].lower())
-        #     token_counts = Counter(tokens)
-        #     for key, value in token_counts.items():
-        #         vec[key] = value / len(lexicon)
+        # Load the documents and train the model, if flag set to retrain
+        if retrain:
+            model = Doc2Vec(documents, vector_size=50, window=4, min_count=2, workers=4, epochs=40)
+            model.train(documents, total_examples=model.corpus_count, epochs=model.epochs)
+            model.save(model_filename)
 
+        # Load the model
+        model = Doc2Vec.load(model_filename)
 
+        # vectorize training and test sets
+        doc2vec_model_vectors_train = np.zeros((len(tokens), 50))
+        for i in range(0, len(tokens)):
+            doc2vec_model_vectors_train[i, ] = model.infer_vector(tokens[i]).transpose()
 
+        doc2vec_model_vectors_test = np.zeros((len(tokens_test), 50))
+        for i in range(0, len(tokens_test)):
+            doc2vec_model_vectors_test[i, ] = model.infer_vector(tokens_test[i]).transpose()
 
+        return model, doc2vec_model_vectors_train, doc2vec_model_vectors_test, train_target, test_target
 
-        # TF-IDF Vector calculation
-        # Count of each word in a document / # of docs in which word occurs
-
-        
-
-
-    # def _nltk_tokenizer(self, tweets_df):
-    #     full_texts = tweets_df['full_text'].tolist()
-    #     id_strings = tweets_df['id_str'].tolist()
-    #     full_texts_dict = {}
-    #     full_text_list = []
-
-    #     all_stopwords = set(stopwords.words('english'))
-
-    #     print(f'[WordTokenizer] Tokenizing full text of {len(full_texts)} tweets...')
-    #     for i, text in enumerate(full_texts):
-    #         # Tokenize
-    #         words = word_tokenize(text)
-    #         # Remove single chars, numbers, lowercase all, then remove stop words
-    #         words = [word for word in words if len(word) > 1]
-    #         words = [word for word in words if not word.isnumeric()]
-    #         words = [word.lower() for word in words]
-    #         words = [word for word in words if word not in all_stopwords]
-
-    #         # Word distribution
-    #         word_dist = FreqDist(words)
-    #         # Only get actual words for now, not frequency. Might use later.
-    #         word_list = [w[0] for w in word_dist.most_common(50)]
-
-    #         # I don't use this now, but I probably will later
-    #         ids = id_strings[i]
-    #         full_texts_dict.update({ids: word_list})
-    #         full_text_list.extend(words)
-
-    #     return full_text_list, full_texts_dict, word_dist
-
-    # def word_tokenizer(self, filename):
-    #     # Load the tweets
-    #     tweets_df = self._jsonl_to_df(filename)
-    #     words_list, words_dict, word_dist = self._nltk_tokenizer(tweets_df)
-
-    #     # Apply bag of words, maybe
-    #     return words_list, words_dict, word_dist
-
+    def random_forest_classifier(self, train_vec, test_vec, train_target, test_target):
+        print('[WordTokenizer] Building classifier...')
+        classifier = RandomForestClassifier(n_estimators = 100, max_depth = 10, random_state = 5)
+        classifier.fit(train_vec, train_target)
+        classifier_pred = classifier.predict(test_vec)  # evaluate on test set
+        classifier_results = round(metrics.f1_score(test_target, classifier_pred, average='macro'), 3)
+        return classifier_pred, classifier_results
