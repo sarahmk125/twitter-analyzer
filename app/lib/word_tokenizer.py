@@ -20,6 +20,7 @@ from gensim.test.utils import get_tmpfile
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn.ensemble import RandomForestClassifier
+from app.lib.utils.jsonl import jsonl_to_df
 
 
 """
@@ -34,34 +35,10 @@ class WordTokenizer(object):
     def __init__(self):
         pass
 
-    def _load_jsonl(self, input_path) -> list:
-        """
-        Read list of objects from a JSON lines file.
-        """
-        data = []
-        with open(input_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                data.append(json.loads(line.rstrip('\n|\r')))
-        print('[WordTokenizer] Loaded {} records from {}'.format(len(data), input_path))
-        return data
-
-    def _jsonl_to_df(self, filename, db_cols):
-        jsonl_file = 'app/tweets/' + filename + '.jsonl'
-        tweets_data = self._load_jsonl(jsonl_file)
-        db_data = []
-        # Note: ignoring hashtags for now since they're nested
-        for d in tweets_data:
-            db_data.append([])
-            for col in db_cols:
-                db_data[-1].append(d.get(col, float('nan')))
-
-        tweets_df = pd.DataFrame(db_data, columns=db_cols)
-        return tweets_df
-
     def _user_grouper(self, filename):
         # For each unique user, join all tweets into one tweet row in the new df.
         db_cols = ['search_query', 'id_str', 'full_text', 'created_at', 'favorite_count', 'username', 'user_description']
-        tweets_df = self._jsonl_to_df(filename, db_cols)
+        tweets_df = jsonl_to_df(filename, db_cols)
         users = list(tweets_df['username'].unique())
         tweets_by_user_df = pd.DataFrame(columns=['username', 'user_description', 'tweets'])
 
@@ -134,7 +111,7 @@ class WordTokenizer(object):
         
         # Get user classes
         db_cols = ['class', 'user_description', 'username']
-        user_class_df = self._jsonl_to_df('users', db_cols)
+        user_class_df = jsonl_to_df('users', db_cols)
         user_class_df = user_class_df[['username','class']]
 
         tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
@@ -234,7 +211,7 @@ class WordTokenizer(object):
         tweets_by_user_sorted_vec = np.argsort(tweets_by_user_vec.toarray()).flatten()[::-1]
 
         # top_words_tfidf = feature_array[tweets_by_user_sorted_vec][:count_words]
-        return tweets_by_user_vec, tweets_by_user_vec_test, train_target, test_target
+        return tweets_by_user_df, tweets_by_user_vec, tweets_by_user_vec_test, train_target, test_target
 
     def nn_embeddings(self, filename, retrain=True):
         print('[WordTokenizer] Getting NN embedding vectors...')
@@ -282,7 +259,7 @@ class WordTokenizer(object):
         for i in range(0, len(tokens_test)):
             doc2vec_model_vectors_test[i, ] = model.infer_vector(tokens_test[i]).transpose()
 
-        return model, doc2vec_model_vectors_train, doc2vec_model_vectors_test, train_target, test_target
+        return tweets_by_user_df, model, doc2vec_model_vectors_train, doc2vec_model_vectors_test, train_target, test_target
 
     def random_forest_classifier(self, train_vec, test_vec, train_target, test_target):
         print('[WordTokenizer] Building classifier...')
