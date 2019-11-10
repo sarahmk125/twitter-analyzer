@@ -142,10 +142,10 @@ class EmbeddingAnalysisPlotter(object):
         # Get list of users in this set
         user_list = user_df['username'].tolist()
 
-        print(f'[Ontology] Visualizing MDS on users for {name}...')
+        print(f'[EmbeddingAnalysisPlotter] Visualizing MDS on users for {name}...')
         self._plot_mds(mds_array, name, user_list, True)
 
-        print(f'[Ontology] Visualizing KMeans on users for {name}...')
+        print(f'[EmbeddingAnalysisPlotter] Visualizing KMeans on users for {name}...')
         for kmeans_grouping in kmeans_groups:
             mapped_users = [(user_list[i], group) for i, group in enumerate(kmeans_grouping.tolist())]
             self._plot_kmeans_results(name, kmeans_grouping, 'Count Users', f'Users per KMeans Group: {name.upper()} Embeddings')
@@ -153,10 +153,10 @@ class EmbeddingAnalysisPlotter(object):
             self._plot_kmeans_scatter(name, mds_array, kmeans_grouping)
 
     def plot_token_results(self, mds_array, kmeans_groups, name):
-        print(f'[Ontology] Visualizing MDS on tokens for {name}...')
+        print(f'[EmbeddingAnalysisPlotter] Visualizing MDS on tokens for {name}...')
         self._plot_mds(mds_array, name)
 
-        print(f'[Ontology] Visualizing KMeans on tokens for {name}...')
+        print(f'[EmbeddingAnalysisPlotter] Visualizing KMeans on tokens for {name}...')
         for kmeans_grouping in kmeans_groups:
             self._plot_kmeans_results(name, kmeans_grouping, 'Count Tokens', f'Tokens per KMeans Group: {name.upper()} Embeddings')
             self._plot_kmeans_scatter(name, mds_array, kmeans_grouping)

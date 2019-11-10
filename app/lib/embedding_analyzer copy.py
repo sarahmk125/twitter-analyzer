@@ -27,15 +27,15 @@ class EmbeddingAnalyzer(object):
         return y_kmeans
 
     def analyzer(self, name, transform, mds=True):
-        print(f'[EmbeddingAnalyzer] Performing MDS on {transform} for {name}...')
+        print(f'[Ontology] Performing MDS on {transform} for {name}...')
         mds_array = self._mds()
 
         if mds:
-            print(f'[EmbeddingAnalyzer] Performing KMeans on {transform} for {name}...')
+            print(f'[Ontology] Performing KMeans on {transform} for {name}...')
             kmeans_groups = [self._kmeans(2, mds_array), self._kmeans(4, mds_array), self._kmeans(8, mds_array), self._kmeans(10, mds_array)]
             return mds_array, kmeans_groups
         
-        print(f'[EmbeddingAnalyzer] Performing KMeans on {transform} for {name}...')
+        print(f'[Ontology] Performing KMeans on {transform} for {name}...')
         kmeans_groups = [self._kmeans(2, self.matrix), self._kmeans(4, self.matrix), self._kmeans(8, self.matrix), self._kmeans(10, self.matrix)]
         return mds_array, kmeans_groups
         

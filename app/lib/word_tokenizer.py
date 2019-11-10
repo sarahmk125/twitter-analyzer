@@ -72,7 +72,7 @@ class WordTokenizer(object):
 
         return text
 
-    def _parse_words(self, text, drop_stopwords=False, stemming=False): 
+    def _parse_words(self, text, stemming=False): 
         # split document into individual words
         tokens = text.split()
         re_punc = re.compile('[%s]' % re.escape(string.punctuation))
@@ -88,10 +88,6 @@ class WordTokenizer(object):
 
         # filter out tokens that are more than twenty characters long
         tokens = [word for word in tokens if len(word) < 21]
-
-        # filter out stop words if requested
-        if drop_stopwords:
-            tokens = [w for w in tokens if w not in stoplist]
 
         # perform word stemming if requested
         if stemming:
