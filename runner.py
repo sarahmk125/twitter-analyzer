@@ -38,6 +38,7 @@ if __name__ == "__main__":
         test_vec_tfidf, \
         train_target_tfidf, \
         test_target_tfidf = word_tokenizer.tf_idf('tweets', 30)
+
     user_df_nn, \
         model_nn, \
         train_vec_nn, \
