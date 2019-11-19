@@ -11,7 +11,7 @@ def _load_jsonl(input_path) -> list:
     with open(input_path, 'r', encoding='utf-8') as f:
         for line in f:
             data.append(json.loads(line.rstrip('\n|\r')))
-    print('[WordTokenizer] Loaded {} records from {}'.format(len(data), input_path))
+    print('[LoadJsonl] Loaded {} records from {}'.format(len(data), input_path))
     return data
 
 def jsonl_to_df(filename, db_cols):
