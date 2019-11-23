@@ -104,11 +104,11 @@ class WordTokenizer(object):
     def _get_train_test_data(self, filename):
         # Get df, and list of all users' tweets.
         tweets_by_user_df = self._user_grouper(filename)
-        
+
         # Get user classes
         db_cols = ['class', 'user_description', 'username']
         user_class_df = jsonl_to_df('users', db_cols)
-        user_class_df = user_class_df[['username','class']]
+        user_class_df = user_class_df[['username', 'class']]
 
         tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
 

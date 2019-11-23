@@ -5,6 +5,8 @@ import app.constants as constants
 from twython import Twython
 from math import ceil
 
+from app.lib.utils.jsonl import build_filename
+
 
 """
 Sources:
@@ -52,11 +54,8 @@ class TwitterSearch(object):
         statuses = tweets['statuses']
         print(f"[TwitterSearch] Found {len(statuses)} tweets to write for query '{query_string}'.")
 
-        dirpath = os.getcwd()
         filename = filename if filename else 'tweets'
-        jsonl_file = dirpath + '/app/tweets/' + filename
-        if '.jsonl' not in jsonl_file:
-            jsonl_file = jsonl_file + '.jsonl'
+        jsonl_file = build_filename(filename)
         self._tweets_to_jsonl(statuses, jsonl_file, query_string)
         print(f"[TwitterSearch] Wrote tweets to {filename}.")
 

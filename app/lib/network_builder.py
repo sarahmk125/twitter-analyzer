@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import string
 
-from app.lib.utils.jsonl import jsonl_to_df
+from app.lib.utils.jsonl import jsonl_to_df, df_to_jsonl
 from statistics import mean
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
@@ -29,6 +29,8 @@ class NetworkBuilder(object):
     def _user_grouper(self, filename):
         # For each unique user, join all tweets into one tweet row in the new df.
         # Also, have count of number of tweets and total number of retweets
+        print('[NetworkBuilder] Grouping users and assigning features...')
+
         db_cols = ['search_query', 'id_str', 'full_text', 'created_at', 'favorite_count', 'username', 'user_description']
         tweets_df = jsonl_to_df(filename, db_cols)
         users = list(tweets_df['username'].unique())
@@ -66,10 +68,20 @@ class NetworkBuilder(object):
 
             user_description = trunc_df['user_description'].tolist()[0]
             full_string = ' '.join(trunc_df["full_text"])
+
+            # Get class for user
+            if '#maga' in user_description.lower() or '#maga' in full_string.lower() or 'RT @BernieSanders' in full_string or '#elizabethwarren' in full_string.lower():
+                classif = 'M'
+            elif '#theresistance' in user_description.lower() or '#maga' in full_string.lower() or 'RT @realDonaldTrump' in full_string:
+                classif = 'R'
+            else:
+                classif = 'U'
+
             tweets_by_user_df = tweets_by_user_df.append(
                 {
                     'username': user,
                     'user_description': user_description,
+                    'class': classif,
                     'num_tweets': num_tweets,
                     'num_retweets': num_retweets,
                     'ratio_retweets': ratio_retweets,
@@ -84,16 +96,9 @@ class NetworkBuilder(object):
                 },
                 ignore_index=True)
 
-        # Class DF as numeric classes
-        db_cols_class = ['class', 'username']
-        user_class_df = jsonl_to_df('users', db_cols_class)
-        user_class_df['class'] = user_class_df.apply(lambda row: self._numeric_classes(row), axis=1)
-
-        # Join dfs
-        full_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
-
         # Return the data frame with one row per user, tweets concatenated into one string.
-        return full_df
+        df_to_jsonl(tweets_by_user_df, 'users')
+        return tweets_by_user_df
 
     def _plot_retweet_behavior(self, df, column, title, filename):
         # Data aggregation
@@ -120,14 +125,15 @@ class NetworkBuilder(object):
         plt.tight_layout()
         plt.savefig('./app/scripts/visuals/' + filename + '.png')
 
-    def _knn(self, df):
+    def _knn(self, df, test_size=0.2):
+        print('[NetworkBuilder] Running KNN...')
         # Format data
         df_x = df[['ratio_retweets', 'ratio_replies', 'avg_ratio_capital_letters', 'avg_ratio_punctuation_chars']]
         x = df_x.values.tolist()
         y = df['class']
 
         # Train test split
-        X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=60)
+        X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=60)
 
         # Fit classifier
         knn_model = KNeighborsClassifier(n_neighbors=1)
@@ -135,8 +141,12 @@ class NetworkBuilder(object):
         y_pred = knn_model.predict(X_test)
         print(classification_report(y_test, y_pred))
 
-    def build_network(self, filename='tweets'):
-        users_df = self._user_grouper(filename)
+    def build_network(self, filename_tweets='tweets', filename_users='users', read_file=False):
+        print('[NetworkBuilder] Starting to build and classify...')
+        if read_file:
+            users_df = jsonl_to_df(filename_users)
+        else:
+            users_df = self._user_grouper(filename_tweets)
         self._plot_retweet_behavior(users_df, 'ratio_retweets', 'Ratio Retweets', 'avg_ratio_retweets_by_class')
         self._plot_retweet_behavior(users_df, 'ratio_replies', 'Ratio Replies', 'avg_ratio_replies_by_class')
-        self._knn(users_df)
+        self._knn(users_df, test_size=0.2)
