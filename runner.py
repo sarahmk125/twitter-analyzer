@@ -43,7 +43,7 @@ if __name__ == "__main__":
         )
 
     # 2) User Analyzer: KNN based on retweets and replies; also builds users file
-    UserAnalyzer().analyzer(read_file=True, filename_users='users')
+    rt_knn_model = UserAnalyzer().analyzer(read_file=True, filename_users='users')
 
     # 3) Build document embeddings and tokenize for more analysis
     word_tokenizer = WordTokenizer()
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         train_vec_nn, \
         test_vec_nn, \
         train_target_nn, \
-        test_target_nn = word_tokenizer.nn_embeddings(filename='tweets', retrain=True)
+        test_target_nn = word_tokenizer.nn_embeddings(filename='tweets')
 
     # 3) Do KMeans as exploratory function
     tfidf_docs_mds_array, tfidf_docs_kmeans_groups = EmbeddingAnalyzer(train_vec_tfidf).analyzer('tfidf', 'docs')
@@ -68,7 +68,14 @@ if __name__ == "__main__":
     EmbeddingAnalysisPlotter().plot_user_results(nn_docs_mds_array, nn_docs_kmeans_groups, 'nn_docs', user_df_nn)
 
     # 4) User embedding analyzer: KNN on embeddings
-    UserEmbeddingAnalyzer().analyzer('tfidf', train_vec_tfidf, test_vec_tfidf, train_target_tfidf, test_target_tfidf)
-    UserEmbeddingAnalyzer().analyzer('nn', train_vec_nn, test_vec_nn, train_target_nn, test_target_nn)
+    tfidf_knn_model = UserEmbeddingAnalyzer().analyzer('tfidf', train_vec_tfidf, test_vec_tfidf, train_target_tfidf, test_target_tfidf)
+    nn_knn_model = UserEmbeddingAnalyzer().analyzer('nn', train_vec_nn, test_vec_nn, train_target_nn, test_target_nn)
 
     # 5) Take most accurate model (TF-IDF KNN), classify unknown users, build network from MDS Euclidean distance
+    user_df_tfidf_full, \
+        vec_tfidf_full = word_tokenizer.tf_idf('tweets', 30, get_all_data=True)
+    tfidf_docs_mds_array_full = EmbeddingAnalyzer(vec_tfidf_full).analyzer('tfidf', 'all_docs', kmeans=False)
+
+    # only take a portion for the above so it doesn't take forever?
+    # build graph euclidean distance
+    # compare to random forrest?

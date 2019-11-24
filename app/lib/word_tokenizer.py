@@ -92,24 +92,6 @@ class WordTokenizer(object):
 
         return tokens, text
 
-    def _get_train_test_data(self, filename):
-        # Get df, and list of all users' tweets.
-        tweets_by_user_df = self._user_grouper(filename)
-
-        # Get user classes
-        db_cols = ['class', 'user_description', 'username']
-        user_class_df = jsonl_to_df('users', db_cols)
-        user_class_df = user_class_df[['username', 'class']]
-
-        tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
-        # Only use known tags
-        tagged_df = tagged_df[tagged_df['class'] != 'U']
-
-        train, test = train_test_split(tagged_df, test_size=0.2, random_state=60)
-        train_target = train['class']
-        test_target = test['class']
-        return train, test, train_target, test_target
-
     def analyst_judgement(self, filename, count_words):
         print('[WordTokenizer] Getting analyst judgement vectors...')
         # Get df, and list of all users' tweets.
@@ -176,10 +158,13 @@ class WordTokenizer(object):
         tweets_by_user_array_test = np.array(tweets_by_user_vec_test)
         return top_words, tweets_by_user_array, tweets_by_user_array_test, train_target, test_target
 
-    def tf_idf(self, filename, count_words):
+    def tf_idf(self, filename, count_words, get_all_data=False):
         print('[WordTokenizer] Getting TF-IDF vectors...')
         # Get df, and list of all users' tweets.
-        tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
+        if get_all_data:
+            tweets_by_user_df = self._get_all_data(filename)
+        else:
+            tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
 
         # NOTE: cleanup with stopwords makes it not english because the string removal isn't right.
         # all_stopwords = list(stopwords.words('english'))
@@ -188,27 +173,35 @@ class WordTokenizer(object):
         #     tweets_by_user_df['tweets'] = tweets_by_user_df['tweets'].str.replace(word,'')
 
         tweets_by_user_list = tweets_by_user_df['tweets'].tolist()
-        tweets_by_user_list_test = tweets_by_user_df_test['tweets'].tolist()
+        if not get_all_data:
+            tweets_by_user_list_test = tweets_by_user_df_test['tweets'].tolist()
 
         # Calculate TF-IDF
         vectorizer = TfidfVectorizer()
         tweets_by_user_vec = vectorizer.fit_transform(tweets_by_user_list)
-        tweets_by_user_vec_test = vectorizer.transform(tweets_by_user_list_test)
+        if not get_all_data:
+            tweets_by_user_vec_test = vectorizer.transform(tweets_by_user_list_test)
 
         # Change up matrices to get most important words
-        feature_array = np.array(vectorizer.get_feature_names())
-        tweets_by_user_sorted_vec = np.argsort(tweets_by_user_vec.toarray()).flatten()[::-1]
-
+        # feature_array = np.array(vectorizer.get_feature_names())
+        # tweets_by_user_sorted_vec = np.argsort(tweets_by_user_vec.toarray()).flatten()[::-1]
         # top_words_tfidf = feature_array[tweets_by_user_sorted_vec][:count_words]
+
+        if get_all_data:
+            return tweets_by_user_df, tweets_by_user_vec
+
         return tweets_by_user_df, tweets_by_user_vec, tweets_by_user_vec_test, train_target, test_target
 
-    def nn_embeddings(self, filename, retrain=True):
+    def nn_embeddings(self, filename, get_all_data=False):
         print('[WordTokenizer] Getting NN embedding vectors...')
         # NOTE: getting embeddings for entire corpus. Not splitting into train/test yet.
         #       The train/test split will occur outside of this function as the model develops next assignment.
 
         # Use DF for all tweets by user
-        tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
+        if get_all_data:
+            tweets_by_user_df = self._get_all_data(filename)
+        else:
+            tweets_by_user_df, tweets_by_user_df_test, train_target, test_target = self._get_train_test_data(filename)
 
         # Format the documents
         tweets_by_user_list = tweets_by_user_df['tweets'].tolist()
@@ -219,36 +212,64 @@ class WordTokenizer(object):
             doc_tokens, text_string = self._parse_words(text_string)
             tokens.append(doc_tokens)
 
-        # Format test documents
-        tweets_by_user_list_test = tweets_by_user_df_test['tweets'].tolist()
-        documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(tweets_by_user_list_test)]
-        tokens_test = []
-        for doc in tweets_by_user_list_test:
-            text_string = self._parse_doc(doc)
-            doc_tokens, text_string = self._parse_words(text_string)
-            tokens_test.append(doc_tokens)
+        if not get_all_data:
+            # Format test documents
+            tweets_by_user_list_test = tweets_by_user_df_test['tweets'].tolist()
+            documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(tweets_by_user_list_test)]
+            tokens_test = []
+            for doc in tweets_by_user_list_test:
+                text_string = self._parse_doc(doc)
+                doc_tokens, text_string = self._parse_words(text_string)
+                tokens_test.append(doc_tokens)
 
-        model_filename = get_tmpfile('doc2vec_model')
-
-        # Load the documents and train the model, if flag set to retrain
-        if retrain:
-            model = Doc2Vec(documents, vector_size=50, window=4, min_count=2, workers=4, epochs=40)
-            model.train(documents, total_examples=model.corpus_count, epochs=model.epochs)
-            model.save(model_filename)
-
-        # Load the model
-        model = Doc2Vec.load(model_filename)
+        model = Doc2Vec(documents, vector_size=50, window=4, min_count=2, workers=4, epochs=40)
+        model.train(documents, total_examples=model.corpus_count, epochs=model.epochs)
 
         # vectorize training and test sets
         doc2vec_model_vectors_train = np.zeros((len(tokens), 50))
         for i in range(0, len(tokens)):
             doc2vec_model_vectors_train[i, ] = model.infer_vector(tokens[i]).transpose()
 
-        doc2vec_model_vectors_test = np.zeros((len(tokens_test), 50))
-        for i in range(0, len(tokens_test)):
-            doc2vec_model_vectors_test[i, ] = model.infer_vector(tokens_test[i]).transpose()
+        if not get_all_data:
+            doc2vec_model_vectors_test = np.zeros((len(tokens_test), 50))
+            for i in range(0, len(tokens_test)):
+                doc2vec_model_vectors_test[i, ] = model.infer_vector(tokens_test[i]).transpose()
+
+        if get_all_data:
+            return tweets_by_user_df, model, doc2vec_model_vectors_train
 
         return tweets_by_user_df, model, doc2vec_model_vectors_train, doc2vec_model_vectors_test, train_target, test_target
+
+    def _get_train_test_data(self, filename, only_known=True):
+        # Get df, and list of all users' tweets.
+        tweets_by_user_df = self._user_grouper(filename)
+
+        # Get user classes
+        db_cols = ['class', 'user_description', 'username']
+        user_class_df = jsonl_to_df('users', db_cols)
+        user_class_df = user_class_df[['username', 'class']]
+
+        tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
+
+        if only_known:
+            tagged_df = tagged_df[tagged_df['class'] != 'U']
+
+        train, test = train_test_split(tagged_df, test_size=0.2, random_state=60)
+        train_target = train['class']
+        test_target = test['class']
+        return train, test, train_target, test_target
+
+    def _get_all_data(self, filename):
+        # Get df, and list of all users' tweets.
+        tweets_by_user_df = self._user_grouper(filename)
+
+        # Get user classes
+        db_cols = ['class', 'user_description', 'username']
+        user_class_df = jsonl_to_df('users', db_cols)
+        user_class_df = user_class_df[['username', 'class']]
+
+        tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
+        return tagged_df
 
     def random_forest_classifier(self, train_vec, test_vec, train_target, test_target):
         print('[WordTokenizer] Building classifier...')

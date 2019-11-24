@@ -2,14 +2,14 @@
 
 ## Background
 
-This projects will analyze Tweets relating to violence. Several different Twitter queries will be performed and assessed prior to implementing a categorization model of any sort.
+This projects will analyze political Tweets relating to violence and the election. Several different Twitter queries will be performed and assessed prior to implementing a categorization model of any sort.
 
 ## Instructions
 
 General: 
 
 - Run: `pip install -r requirements.txt`
-- Run: `python runner.py`. Note that no command line arguments added at this time; for more information on what occurs, see the `runner.py` file.
+- Run: `python runner.py`. the `-s`/`--seach` command line argument can be added to perform a new Twitter search.
 
 Scripts:
 

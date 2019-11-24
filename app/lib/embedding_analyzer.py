@@ -22,9 +22,12 @@ class EmbeddingAnalyzer(object):
         y_kmeans = kmeans.predict(array)
         return y_kmeans
 
-    def analyzer(self, name, transform, mds=True):
+    def analyzer(self, name, transform, mds=True, kmeans=True):
         print(f'[EmbeddingAnalyzer] Performing MDS on {transform} for {name}...')
         mds_array = self._mds()
+
+        if not kmeans:
+            return mds_array
 
         if mds:
             print(f'[EmbeddingAnalyzer] Performing KMeans on {transform} for {name}...')

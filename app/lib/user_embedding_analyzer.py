@@ -12,7 +12,9 @@ class UserEmbeddingAnalyzer(object):
         knn_model.fit(X_train, y_train)
         y_pred = knn_model.predict(X_test)
         print(classification_report(y_test, y_pred))
+        return knn_model
 
     def analyzer(self, name, X_train, X_test, y_train, y_test):
         print(f'[EmbeddingAnalyzer] Classifying with {name}...')
-        self._knn(name, X_train, X_test, y_train, y_test, test_size=0.2)
+        knn_model = self._knn(name, X_train, X_test, y_train, y_test, test_size=0.2)
+        return knn_model

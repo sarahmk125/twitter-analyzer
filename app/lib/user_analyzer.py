@@ -128,6 +128,7 @@ class UserAnalyzer(object):
         knn_model.fit(X_train, y_train)
         y_pred = knn_model.predict(X_test)
         print(classification_report(y_test, y_pred))
+        return knn_model
 
     def analyzer(self, filename_tweets='tweets', filename_users='users', read_file=False):
         print('[UserAnalyzer] Starting to build and classify...')
@@ -145,4 +146,5 @@ class UserAnalyzer(object):
         users_df_known = users_df[users_df['class'] != 'U']
         self._plot_retweet_behavior(users_df_known, 'ratio_retweets', 'Ratio Retweets', 'avg_ratio_retweets_by_class')
         self._plot_retweet_behavior(users_df_known, 'ratio_replies', 'Ratio Replies', 'avg_ratio_replies_by_class')
-        self._knn(users_df_known, test_size=0.2)
+        knn_model = self._knn(users_df_known, test_size=0.2)
+        return knn_model
