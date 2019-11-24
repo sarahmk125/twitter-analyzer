@@ -1,10 +1,6 @@
-import pandas as pd
 import numpy as np
-import scipy as sp
-import matplotlib.pyplot as plt
 
 from sklearn.manifold import TSNE
-from app.lib.utils.jsonl import jsonl_to_df
 from sklearn.cluster import KMeans
 
 
@@ -22,7 +18,7 @@ class EmbeddingAnalyzer(object):
         return mds_array
 
     def _kmeans(self, clusters, array):
-        kmeans = KMeans(n_clusters=clusters, random_state=0).fit(array)
+        kmeans = KMeans(n_clusters=clusters, random_state=60).fit(array)
         y_kmeans = kmeans.predict(array)
         return y_kmeans
 
@@ -32,12 +28,9 @@ class EmbeddingAnalyzer(object):
 
         if mds:
             print(f'[EmbeddingAnalyzer] Performing KMeans on {transform} for {name}...')
-            kmeans_groups = [self._kmeans(2, mds_array), self._kmeans(4, mds_array), self._kmeans(8, mds_array), self._kmeans(10, mds_array)]
+            kmeans_groups = [self._kmeans(2, mds_array), self._kmeans(4, mds_array)]
             return mds_array, kmeans_groups
-        
-        print(f'[EmbeddingAnalyzer] Performing KMeans on {transform} for {name}...')
-        kmeans_groups = [self._kmeans(2, self.matrix), self._kmeans(4, self.matrix), self._kmeans(8, self.matrix), self._kmeans(10, self.matrix)]
-        return mds_array, kmeans_groups
-        
 
-            
+        print(f'[EmbeddingAnalyzer] Performing KMeans on {transform} for {name}...')
+        kmeans_groups = [self._kmeans(2, self.matrix), self._kmeans(4, self.matrix)]
+        return mds_array, kmeans_groups

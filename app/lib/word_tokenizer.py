@@ -1,10 +1,6 @@
 import pandas as pd
-import json
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import copy
-import os
 import re
 import string
 
@@ -72,7 +68,7 @@ class WordTokenizer(object):
 
         return text
 
-    def _parse_words(self, text, stemming=False): 
+    def _parse_words(self, text): 
         # split document into individual words
         tokens = text.split()
         re_punc = re.compile('[%s]' % re.escape(string.punctuation))
@@ -88,11 +84,6 @@ class WordTokenizer(object):
 
         # filter out tokens that are more than twenty characters long
         tokens = [word for word in tokens if len(word) < 21]
-
-        # perform word stemming if requested
-        if stemming:
-            ps = PorterStemmer()
-            tokens = [ps.stem(word) for word in tokens]
 
         # recreate the document string from parsed words
         text = ''
@@ -111,8 +102,10 @@ class WordTokenizer(object):
         user_class_df = user_class_df[['username', 'class']]
 
         tagged_df = pd.merge(tweets_by_user_df, user_class_df, left_on='username', right_on='username')
+        # Only use known tags
+        tagged_df = tagged_df[tagged_df['class'] != 'U']
 
-        train, test = train_test_split(tagged_df, test_size=0.2)
+        train, test = train_test_split(tagged_df, test_size=0.2, random_state=60)
         train_target = train['class']
         test_target = test['class']
         return train, test, train_target, test_target
@@ -259,7 +252,7 @@ class WordTokenizer(object):
 
     def random_forest_classifier(self, train_vec, test_vec, train_target, test_target):
         print('[WordTokenizer] Building classifier...')
-        classifier = RandomForestClassifier(n_estimators = 100, max_depth = 10, random_state = 5)
+        classifier = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=5)
         classifier.fit(train_vec, train_target)
         classifier_pred = classifier.predict(test_vec)  # evaluate on test set
         classifier_results = round(metrics.f1_score(test_target, classifier_pred, average='macro'), 3)

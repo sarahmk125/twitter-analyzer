@@ -9,14 +9,14 @@ from itertools import combinations
 
 class GraphWeb(object):
     def __init__(self, groups, labels):
-        self.groups = groups 
+        self.groups = groups
         self.labels = labels
         self.nodes = self._get_nodes()
         self.edges = self._get_edges()
-    
+
     def _get_nodes(self):
         return self.labels
-    
+
     def _get_edges(self):
         edges = []
         for group in self.groups:
@@ -38,4 +38,3 @@ class GraphWeb(object):
         print(f'[GraphWeb] Visualizing graph: {name}...')
         nx.draw(g)
         plt.savefig(f'app/scripts/visuals/graph_web_{name}.png')
-        
