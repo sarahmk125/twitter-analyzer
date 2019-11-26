@@ -38,3 +38,6 @@ class GraphWeb(object):
         print(f'[GraphWeb] Visualizing graph: {name}...')
         nx.draw(g)
         plt.savefig(f'app/scripts/visuals/graph_web_{name}.png')
+
+    # Euclidean distance
+    # dist = np.linalg.norm(a-b)

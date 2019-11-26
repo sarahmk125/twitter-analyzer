@@ -114,7 +114,7 @@ class UserAnalyzer(object):
         plt.savefig('./app/scripts/visuals/' + filename + '.png')
 
     def _knn(self, df, test_size=0.2):
-        print('[UserAnalyzer] Running KNN...')
+        print('[UserAnalyzer] Running KNN with user behavior...')
         # Format data
         df_x = df[['ratio_retweets', 'ratio_replies', 'avg_ratio_capital_letters', 'avg_ratio_punctuation_chars']]
         x = df_x.values.tolist()

@@ -1,6 +1,4 @@
 import json
-import os
-import pandas as pd
 import app.constants as constants
 from twython import Twython
 from math import ceil
@@ -78,7 +76,7 @@ class TwitterSearch(object):
             self._search_set(query_string, query_list, result_type, count, filename)
             return
 
-        # Requires each query to have more than 100, math things
+        # Requires each query to have no more than 100, math things
         iters = ceil(count / 100)
         last_iter_count = count % 100
         for i in range(0, iters):

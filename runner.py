@@ -1,12 +1,19 @@
 import argparse
 
 from app.lib.twitter_search import TwitterSearch
-from app.lib.word_tokenizer import WordTokenizer
-# from app.lib.graph_web import GraphWeb
+from app.lib.nn_tokenizer import NnTokenizer
+from app.lib.tf_idf_tokenizer import TfIdfTokenizer
+from app.lib.graph_web import GraphWeb
 from app.lib.embedding_analyzer import EmbeddingAnalyzer
 from app.lib.embedding_analysis_plotter import EmbeddingAnalysisPlotter
 from app.lib.user_analyzer import UserAnalyzer
 from app.lib.user_embedding_analyzer import UserEmbeddingAnalyzer
+
+
+# Globals
+COUNT_WORDS = 30
+TWEETS_FILE = 'tweets'
+SAMPLE_RATIO = 0.1
 
 
 if __name__ == "__main__":
@@ -39,26 +46,26 @@ if __name__ == "__main__":
                 'election'
             ],
             count=1000,
-            filename='tweets'
+            filename=TWEETS_FILE
         )
 
     # 2) User Analyzer: KNN based on retweets and replies; also builds users file
     rt_knn_model = UserAnalyzer().analyzer(read_file=True, filename_users='users')
 
     # 3) Build document embeddings and tokenize for more analysis
-    word_tokenizer = WordTokenizer()
     user_df_tfidf, \
+        tf_idf_vectorizer, \
         train_vec_tfidf, \
         test_vec_tfidf, \
         train_target_tfidf, \
-        test_target_tfidf = word_tokenizer.tf_idf('tweets', 30)
+        test_target_tfidf = TfIdfTokenizer().tf_idf_train(TWEETS_FILE, COUNT_WORDS)
 
     user_df_nn, \
         model_nn, \
         train_vec_nn, \
         test_vec_nn, \
         train_target_nn, \
-        test_target_nn = word_tokenizer.nn_embeddings(filename='tweets')
+        test_target_nn = NnTokenizer().nn_embeddings_train(TWEETS_FILE)
 
     # 3) Do KMeans as exploratory function
     tfidf_docs_mds_array, tfidf_docs_kmeans_groups = EmbeddingAnalyzer(train_vec_tfidf).analyzer('tfidf', 'docs')
@@ -67,15 +74,21 @@ if __name__ == "__main__":
     EmbeddingAnalysisPlotter().plot_user_results(tfidf_docs_mds_array, tfidf_docs_kmeans_groups, 'tfidf_docs', user_df_tfidf)
     EmbeddingAnalysisPlotter().plot_user_results(nn_docs_mds_array, nn_docs_kmeans_groups, 'nn_docs', user_df_nn)
 
-    # 4) User embedding analyzer: KNN on embeddings
-    tfidf_knn_model = UserEmbeddingAnalyzer().analyzer('tfidf', train_vec_tfidf, test_vec_tfidf, train_target_tfidf, test_target_tfidf)
-    nn_knn_model = UserEmbeddingAnalyzer().analyzer('nn', train_vec_nn, test_vec_nn, train_target_nn, test_target_nn)
+    # 4) Compare to previous assignment's random forest
+    tfidf_rf_model = UserEmbeddingAnalyzer().rf_analyzer('tfidf', train_vec_tfidf, test_vec_tfidf, train_target_tfidf, test_target_tfidf)
+    nn_rf_model = UserEmbeddingAnalyzer().rf_analyzer('nn', train_vec_nn, test_vec_nn, train_target_nn, test_target_nn)
 
-    # 5) Take most accurate model (TF-IDF KNN), classify unknown users, build network from MDS Euclidean distance
-    user_df_tfidf_full, \
-        vec_tfidf_full = word_tokenizer.tf_idf('tweets', 30, get_all_data=True)
+    # 5) User embedding analyzer: KNN on embeddings
+    tfidf_knn_model = UserEmbeddingAnalyzer().knn_analyzer('tfidf', train_vec_tfidf, test_vec_tfidf, train_target_tfidf, test_target_tfidf)
+    nn_knn_model = UserEmbeddingAnalyzer().knn_analyzer('nn', train_vec_nn, test_vec_nn, train_target_nn, test_target_nn)
+
+    # 6) Take most accurate model (TF-IDF KNN), classify sample including unknown users
+    user_df_tfidf_full, vec_tfidf_full = TfIdfTokenizer().tf_idf_apply(TWEETS_FILE, tf_idf_vectorizer, sample_ratio=SAMPLE_RATIO)
+    tfidf_full_pred = tfidf_knn_model.predict(vec_tfidf_full)
+
+    # 7) Build network from MDS Euclidean distance
     tfidf_docs_mds_array_full = EmbeddingAnalyzer(vec_tfidf_full).analyzer('tfidf', 'all_docs', kmeans=False)
+    print(user_df_tfidf_full.shape)
+    print(user_df_tfidf_full.columns)
 
-    # only take a portion for the above so it doesn't take forever?
-    # build graph euclidean distance
-    # compare to random forrest?
+    # GraphWeb(tfidf_docs_kmeans_groups[3], user_df_tfidf['username'].tolist()).build_graph('tfidf_10_groups')
