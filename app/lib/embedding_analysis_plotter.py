@@ -48,8 +48,8 @@ class EmbeddingAnalysisPlotter(object):
 
         return groups, group_counts
 
-    def _plot_kmeans_scatter(self, name, array, y_kmeans):
-        groups, group_counts = self._get_kmeans_plot_data(y_kmeans)  
+    def _plot_kmeans_scatter(self, name, array, y_kmeans, knn=False):
+        groups, group_counts = self._get_kmeans_plot_data(y_kmeans)
 
         fig, ax = plt.subplots()
         x = array[:, 0]
@@ -58,7 +58,10 @@ class EmbeddingAnalysisPlotter(object):
         legend = ax.legend(*scatter.legend_elements(), loc="lower left", title="Groups")
         ax.add_artist(legend)
         plt.title(f'KMeans Scatter Results: {name.upper()} Embeddings', fontsize=14)
-        plt.savefig(f'app/scripts/visuals/kmeans_scatter_{len(groups)}_{name}.png')
+        if not knn:
+            plt.savefig(f'app/scripts/visuals/kmeans_scatter_{len(groups)}_{name}.png')
+        else:
+            plt.savefig(f'app/scripts/visuals/knn_scatter_{len(groups)}_{name}.png')
 
         plt.close()
 
@@ -103,7 +106,7 @@ class EmbeddingAnalysisPlotter(object):
         fig.savefig(f'app/scripts/visuals/kmeans_classes_{len(groups)}_{name}.png')
         plt.close()
 
-    def plot_user_results(self, mds_array, kmeans_groups, name, user_df):
+    def plot_user_results(self, mds_array, kmeans_groups, name, user_df, class_comparison=True, knn=False):
         # Get list of users in this set
         user_list = user_df['username'].tolist()
 
@@ -111,17 +114,25 @@ class EmbeddingAnalysisPlotter(object):
         self._plot_mds(mds_array, name, user_list, True)
 
         print(f'[EmbeddingAnalysisPlotter] Visualizing KMeans on users for {name}...')
+        if type(kmeans_groups) != list:
+            kmeans_groups = [kmeans_groups]
+
         for kmeans_grouping in kmeans_groups:
             mapped_users = [(user_list[i], group) for i, group in enumerate(kmeans_grouping.tolist())]
+            self._plot_kmeans_scatter(name, mds_array, kmeans_grouping, knn=knn)
             self._plot_kmeans_results(name, kmeans_grouping, 'Count Users', f'Users per KMeans Group: {name.upper()} Embeddings')
-            self._plot_kmeans_class_comparison(name, mapped_users, user_df)
-            self._plot_kmeans_scatter(name, mds_array, kmeans_grouping)
+
+            if class_comparison:
+                self._plot_kmeans_class_comparison(name, mapped_users, user_df)
 
     def plot_token_results(self, mds_array, kmeans_groups, name):
         print(f'[EmbeddingAnalysisPlotter] Visualizing MDS on tokens for {name}...')
         self._plot_mds(mds_array, name)
 
         print(f'[EmbeddingAnalysisPlotter] Visualizing KMeans on tokens for {name}...')
+        if type(kmeans_groups) != list:
+            kmeans_groups = [kmeans_groups]
+
         for kmeans_grouping in kmeans_groups:
             self._plot_kmeans_results(name, kmeans_grouping, 'Count Tokens', f'Tokens per KMeans Group: {name.upper()} Embeddings')
             self._plot_kmeans_scatter(name, mds_array, kmeans_grouping)

@@ -3,7 +3,7 @@ import argparse
 from app.lib.twitter_search import TwitterSearch
 from app.lib.nn_tokenizer import NnTokenizer
 from app.lib.tf_idf_tokenizer import TfIdfTokenizer
-from app.lib.graph_web import GraphWeb
+from app.lib.graph_network import GraphNetwork
 from app.lib.embedding_analyzer import EmbeddingAnalyzer
 from app.lib.embedding_analysis_plotter import EmbeddingAnalysisPlotter
 from app.lib.user_analyzer import UserAnalyzer
@@ -13,7 +13,7 @@ from app.lib.user_embedding_analyzer import UserEmbeddingAnalyzer
 # Globals
 COUNT_WORDS = 30
 TWEETS_FILE = 'tweets'
-SAMPLE_RATIO = 0.1
+SAMPLE_RATIO = 0.03
 
 
 if __name__ == "__main__":
@@ -82,13 +82,17 @@ if __name__ == "__main__":
     tfidf_knn_model = UserEmbeddingAnalyzer().knn_analyzer('tfidf', train_vec_tfidf, test_vec_tfidf, train_target_tfidf, test_target_tfidf)
     nn_knn_model = UserEmbeddingAnalyzer().knn_analyzer('nn', train_vec_nn, test_vec_nn, train_target_nn, test_target_nn)
 
-    # 6) Take most accurate model (TF-IDF KNN), classify sample including unknown users
+    # 6) Take most accurate model (TF-IDF KNN), classify sample including unknown users, and plot
     user_df_tfidf_full, vec_tfidf_full = TfIdfTokenizer().tf_idf_apply(TWEETS_FILE, tf_idf_vectorizer, sample_ratio=SAMPLE_RATIO)
     tfidf_full_pred = tfidf_knn_model.predict(vec_tfidf_full)
-
-    # 7) Build network from MDS Euclidean distance
     tfidf_docs_mds_array_full = EmbeddingAnalyzer(vec_tfidf_full).analyzer('tfidf', 'all_docs', kmeans=False)
-    print(user_df_tfidf_full.shape)
-    print(user_df_tfidf_full.columns)
+    EmbeddingAnalysisPlotter().plot_user_results(
+        tfidf_docs_mds_array_full,
+        tfidf_full_pred,
+        'tfidf_preds',
+        user_df_tfidf_full,
+        class_comparison=False,
+        knn=True)
 
-    # GraphWeb(tfidf_docs_kmeans_groups[3], user_df_tfidf['username'].tolist()).build_graph('tfidf_10_groups')
+    # 7) Build network from Euclidean distance
+    GraphNetwork(tfidf_full_pred, vec_tfidf_full, user_df_tfidf_full).build_graph('tfidf_preds')

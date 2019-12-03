@@ -1,0 +1,50 @@
+[UserAnalyzer] Running KNN with user behavior...
+              precision    recall  f1-score   support
+
+           M       0.86      0.86      0.86        63
+           R       0.57      0.57      0.57        21
+
+    accuracy                           0.79        84
+   macro avg       0.71      0.71      0.71        84
+weighted avg       0.79      0.79      0.79        84
+
+[UserEmbeddingAnalyzer] Running RF with embeddings tfidf...
+              precision    recall  f1-score   support
+
+           M       0.88      0.95      0.92        63
+           R       0.81      0.62      0.70        21
+
+    accuracy                           0.87        84
+   macro avg       0.85      0.79      0.81        84
+weighted avg       0.86      0.87      0.86        84
+
+[UserEmbeddingAnalyzer] Running RF with embeddings nn...
+              precision    recall  f1-score   support
+
+           M       0.82      0.97      0.89        63
+           R       0.80      0.38      0.52        21
+
+    accuracy                           0.82        84
+   macro avg       0.81      0.67      0.70        84
+weighted avg       0.82      0.82      0.80        84
+
+[UserEmbeddingAnalyzer] Running KNN with embeddings tfidf...
+              precision    recall  f1-score   support
+
+           M       0.93      0.90      0.92        63
+           R       0.74      0.81      0.77        21
+
+    accuracy                           0.88        84
+   macro avg       0.84      0.86      0.85        84
+weighted avg       0.89      0.88      0.88        84
+
+[UserEmbeddingAnalyzer] Running KNN with embeddings nn...
+              precision    recall  f1-score   support
+
+           M       0.75      0.68      0.72        63
+           R       0.26      0.33      0.29        21
+
+    accuracy                           0.60        84
+   macro avg       0.51      0.51      0.50        84
+weighted avg       0.63      0.60      0.61        84
+
