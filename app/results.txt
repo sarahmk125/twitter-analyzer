@@ -1,3 +1,8 @@
+Number users unknown: 3483
+Number users MAGA: 292
+Number users Resistance: 125
+
+
 [UserAnalyzer] Running KNN with user behavior...
               precision    recall  f1-score   support
 

@@ -52,8 +52,15 @@ class GraphNetwork(object):
         nx.draw_networkx_nodes(
             g,
             pos,
-            nodelist=[i for i, x in enumerate(self.user_df['class'].tolist()) if x == 'U'],
-            node_color='g',
+            nodelist=[i for i, x in enumerate(self.user_df['class'].tolist()) if (x == 'U' and self.preds[i] == 'M')],
+            node_color='#F0AC1C',
+            node_size=150,
+            alpha=0.9)
+        nx.draw_networkx_nodes(
+            g,
+            pos,
+            nodelist=[i for i, x in enumerate(self.user_df['class'].tolist()) if (x == 'U' and self.preds[i] == 'R')],
+            node_color='#15D6DF',
             node_size=150,
             alpha=0.9)
         nx.draw_networkx_nodes(
@@ -76,7 +83,8 @@ class GraphNetwork(object):
         # Plot neatness
         plt.title('KNN Predictions Network')
         legend_elements = [
-            Line2D([0], [0], marker='o', color='w', label='Unknown', markerfacecolor='g', markersize=10),
+            Line2D([0], [0], marker='o', color='w', label='Unknown - MAGA', markerfacecolor='#F0AC1C', markersize=10),
+            Line2D([0], [0], marker='o', color='w', label='Unknown - Resistance', markerfacecolor='#15D6DF', markersize=10),
             Line2D([0], [0], marker='o', color='w', label='MAGA', markerfacecolor='r', markersize=10),
             Line2D([0], [0], marker='o', color='w', label='Resistance', markerfacecolor='blue', markersize=10)
         ]
